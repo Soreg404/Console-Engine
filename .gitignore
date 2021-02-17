@@ -1,0 +1,6 @@
+
+.vscode/*
+cpm/*
+*.exe
+run.bat
+.gitattributes
