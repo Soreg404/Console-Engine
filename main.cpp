@@ -1,40 +1,101 @@
 #include <iostream>
 #include <windows.h>
 
-#include "screen.h"
+#include <ctime>
+#include <vector>
+
+#include "engine/screen.h"
+
+#define SQ(x) (x) * (x)
 
 const float PI = 3.14159265;
 
+struct vec2 {
+	float x, y;
+};
+
+struct ball {
+	float x = 0, y = 0, r = 2.f, speed = 1.f;
+	vec2 direction = {1, 0};
+};
+
+const unsigned int WIDTH = 130, HEIGHT = 90;
+
 int main() {
 	
-	Screen sc(120, 60);
+	Screen sc(WIDTH, HEIGHT);
 	sc.init();
 	
-	float an = 0.f, an2 = 0.f;
+	srand(time(NULL));
+	
+	std::vector<ball> objects;
+	
+	ball b1 = {20, 15, 4};
+	
+	for(int i = 0; i < 1; i++) {
+		float a = (float)(rand()%200-99) / 100.f;
+		objects.push_back({ rand() % WIDTH, rand() % HEIGHT,  4 + rand() % 6, .3 + rand()%40/100.f, { a, (1.f - abs(a)) * (rand()%2?-1:1) } });
+	}
+	
+	float a = 0;
 	
 	while(1) {
+		
+		// objects[0].x = WIDTH/2 + cos(a*5) * (WIDTH/2);
+		// objects[0].y = HEIGHT/2 + sin(a*3) * (HEIGHT/2);
+		
+		for (int i = 0; i < objects.size(); i++) {
+			objects[i].x += objects[i].direction.x * objects[i].speed;
+			objects[i].y += objects[i].direction.y * objects[i].speed;
+			if(objects[i].speed >= 0.00002) objects[i].speed -= 0.00002;
+			else objects[i].speed = 0;
+		}
+		
+		
 		sc.clearBuffer();
 		
-		sc.drawCharacter(0x2588, { (short)(100 + cos(an2)*8), (short)(12 + sin(an2)*7) });
-		
-		for(float i = 0.f; i < 2 * PI; i+=.01f) {
-			sc.drawCharacter('.', { (short)(60 + cos((i+an2)*2)*14), (short)(20 + sin(i+an)*13) });
+		for(int i = 0; i < objects.size(); i++) {
+			
+			if(objects[i].x < 0) objects[i].x = WIDTH-1;
+			if(objects[i].x >= WIDTH) objects[i].x = 0;
+			if(objects[i].y < 0) objects[i].y = HEIGHT-1;
+			if(objects[i].y >= HEIGHT) objects[i].y = 0;
+			
+			for(int j = 0; j < objects.size(); j++) {
+				
+				if(i == j) continue;
+				
+				float in_x = objects.at(j).x - objects.at(i).x, in_y = objects.at(j).y - objects.at(i).y, d = SQ(in_x) + SQ(in_y);
+				
+				if(d <= SQ(objects.at(i).r + objects.at(j).r)) {
+					vec2 cld = { in_x / d, in_y / d };
+					float halfin = ((objects.at(i).r + objects.at(j).r) - sqrt(d)) / 2 + .5;
+					objects.at(i).x -= cld.x * halfin; objects.at(i).y -= cld.y * halfin;
+					objects.at(j).x += cld.x * halfin; objects.at(j).y += cld.y * halfin;
+					sc.drawLine('@', {objects.at(i).x+1, objects.at(i).y}, {objects.at(j).x+1, objects.at(j).y});
+					
+					
+				}
+			}
 		}
 		
-		
-		for(float i = 0.f; i < 2 * PI; i+=PI/5) {
-			sc.drawLine('.', { (short)(20 + cos(i + an2)*14), (short)(20 + sin((i + an) * 2)*13) }, { 20, 20 });
+		for(auto i = objects.begin(); i < objects.cend(); i++) {
+			sc.drawLine('.', { i->x, i->y }, { i->x + i->direction.x * i->r, i->y + i->direction.y * i->r });
+			for(float x = 0; x < 2 * PI; x += .2) {
+				sc.drawLine('#', { i->x + cos(x) * i->r, i->y + sin(x) * i->r }, { i->x + cos(x+.2) * i->r, i->y + sin(x+.2) * i->r });
+			}
 		}
 		
-		sc.drawLine('*', { (short)(40 + cos(-an)*8 + cos(-an*3)*2), (short)(20 + sin(-an)*5 + sin(-an*9)*1) }, { (short)(40 + cos(an)*15 + cos(an*4)*6 + cos(an*8)*3), (short)(20 + sin(an)*10 + sin(an*4)*5 + sin(an*7)*2) });
+		for (int i = 0; i < objects.size(); i++) {
+			sc.drawCharacter((char)(i+48), { objects[i].x, objects[i].y-1 });
+		}
 		
-		sc.drawCharacter('A', { 60 + sin(an) * 40, 20 + cos(an*3) * 6 });
 		
 		sc.draw();
 		
-		an += 0.002f;
-		an2 += 0.001f;
+		a += .002;
 		
 	}
+	objects.~vector();
 	getchar();
 }

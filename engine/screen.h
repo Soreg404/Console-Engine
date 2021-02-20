@@ -19,6 +19,8 @@ class Screen {
 	
 	int status;
 	
+	bool clip(COORD *pt) const;
+	
 public:
 	
 	enum st {
@@ -60,10 +62,10 @@ public:
 Screen::Screen(int W, int H): cols(W), rows(H), status(0) {}
 
 int Screen::init() {
-	
+	std::cout << rows << "  " << cols;
 	screenBuffer = new wchar_t[rows * cols + 1];
 	
-	// buffer = new Pixel[rows * cols];
+	buffer = new Pixel[rows * cols];
 	
 	console = CreateConsoleScreenBuffer(GENERIC_READ | GENERIC_WRITE, 0, NULL, CONSOLE_TEXTMODE_BUFFER, NULL);
 	
@@ -79,10 +81,6 @@ int Screen::init() {
 	return 1;
 }
 
-void Screen::clearSC() const {
-	SetConsoleCursorPosition(GetStdHandle(STD_OUTPUT_HANDLE), {0, 0});
-}
-
 void Screen::clearBuffer() {
 	if(!(status & st::init_)) return;
 	for (int i = 0; i < rows; i++) {
@@ -95,33 +93,23 @@ void Screen::clearBuffer() {
 	screenBuffer[cols * rows] = '\0';
 }
 
+bool Screen::clip(COORD *pt) const {
+	if(pt->X < 0 || pt->X >= cols || pt->Y < 0 || pt->Y > rows) return false;
+	return true;
+}
+
 void Screen::draw() {
-	// for(int i = 0; i < cols * rows; i++) {
-	// }
+	
 	if(status & st::init_) {
 		DWORD bytesWritten = 0;
 		WriteConsoleOutputCharacterW(console, screenBuffer, cols * rows + 1, { 0, 0 }, &bytesWritten);
 	} else std::cout << "not initialised\n";
 	
-	/* std::cout way
-	
-	if(status & st::init_) {
-		char *tmpBuf = new char[rows * cols + rows];
-		for (int i = 0; i < rows; i++) {
-			for(int j = 0; j < cols; j++) {
-				tmpBuf[cols * i + j] = currentBuffer[cols * i + j].color;
-			}
-			tmpBuf[cols * (i + 1) - 1] = '\n';
-		}
-		std::cout << tmpBuf;
-		delete tmpBuf;
-	} else std::cout << "not initialised\n";
-	clearSC(); */
-	
 }
 
 int Screen::drawCharacter(wchar_t character, COORD pos) {
-	if((pos.X >= 0 && pos.X < cols) && (pos.Y >= 0 && pos.Y < rows)) {
+	
+	if(clip(&pos)) {
 		screenBuffer[pos.Y * cols + pos.X] = character;
 		return 0;
 	}
@@ -130,7 +118,8 @@ int Screen::drawCharacter(wchar_t character, COORD pos) {
 
 int Screen::drawLine(wchar_t character, COORD p1, COORD p2) {
 	
-	// TODO: check if points inside screen (clip)
+	// TODO: check if points inside screen (clip)  -  mostly done
+	// TODO: optimalise
 	
 	int c_x = p2.X - p1.X, c_y = p2.Y - p1.Y;
 	
@@ -143,8 +132,8 @@ int Screen::drawLine(wchar_t character, COORD p1, COORD p2) {
 	
 	for(int i = 0; i <= abs(c_y); i++) {
 		for(int j = 0; j <= abs(c_x); j++) {
-			if(abs(c_y) == 0 || abs(c_x) == 0 || (j <= (float)i * _tan + .5 && j > (float)(i>0?i-1:0) * _tan - .5)) //std::cout << "X";
-				screenBuffer[(start_y + (i * yS)) * cols + (p1.X + (j * xS))] = character;
+			if(abs(c_y) == 0 || abs(c_x) == 0 || (j <= (float)i * _tan + .5 && j > (float)(i>0?i-1:0) * _tan - .5))
+				drawCharacter(character, { p1.X + (j * xS), start_y + (i * yS) });
 		}
 	}
 	
@@ -152,6 +141,8 @@ int Screen::drawLine(wchar_t character, COORD p1, COORD p2) {
 }
 
 int Screen::fillRect(wchar_t character, RECT rect) {
+	
+	// TODO: clip
 	
 	if(	(rect.left >= 0 && rect.left < cols) &&
 		(rect.right >= 0 && rect.right < cols) &&
