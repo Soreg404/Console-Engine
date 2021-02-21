@@ -4,7 +4,9 @@
 #include <fcntl.h>
 #include <math.h>
 
-class Screen {
+#define SC_FULL_BLOCK 1
+
+class Engine : public cEvent {
 
 	int cols, rows;
 
@@ -32,13 +34,13 @@ public:
 	Pixel *currentBuffer = nullptr;
 	
 	wchar_t *screenBuffer;
-	HANDLE console;
+	HANDLE console_out, console_in, hconsole_out;
 	
 	struct Vec2i {
 		int x, y;
 	};
 
-	Screen(int W, int H);
+	Engine(int W, int H);
 
 
 	int init();
@@ -59,29 +61,32 @@ public:
 	DEFINITIONS
 */
 
-Screen::Screen(int W, int H): cols(W), rows(H), status(0) {}
+Engine::Engine(int W, int H): cols(W), rows(H), status(0) {}
 
-int Screen::init() {
+int Engine::init() {
 	std::cout << rows << "  " << cols;
 	screenBuffer = new wchar_t[rows * cols + 1];
 	
 	buffer = new Pixel[rows * cols];
 	
-	console = CreateConsoleScreenBuffer(GENERIC_READ | GENERIC_WRITE, 0, NULL, CONSOLE_TEXTMODE_BUFFER, NULL);
+	console_out = CreateConsoleScreenBuffer(GENERIC_READ | GENERIC_WRITE, 0, NULL, CONSOLE_TEXTMODE_BUFFER, NULL);
+	console_in = GetStdHandle(STD_INPUT_HANDLE);
 	
-	SetConsoleDisplayMode(console, 2, new COORD { (short)cols, (short)rows });
+	SetConsoleDisplayMode(console_out, 2, new COORD { (short)cols, (short)rows });
 	RECT consoleDim;
 	HWND consoleWindow = GetConsoleWindow();
 	GetWindowRect(consoleWindow, &consoleDim);
 	MoveWindow(consoleWindow, 600, 200, (cols + 2) * 8, (rows + 2) * 16, TRUE);
 	
-	SetConsoleActiveScreenBuffer(console);
+	SetConsoleActiveScreenBuffer(console_out);
+	
+	SetConsoleMode(console_in, ENABLE_EXTENDED_FLAGS | ENABLE_WINDOW_INPUT | ENABLE_MOUSE_INPUT);
 	
 	status |= st::init_;
 	return 1;
 }
 
-void Screen::clearBuffer() {
+void Engine::clearBuffer() {
 	if(!(status & st::init_)) return;
 	for (int i = 0; i < rows; i++) {
 		for (int j = 0; j < cols; j++) {
@@ -93,21 +98,21 @@ void Screen::clearBuffer() {
 	screenBuffer[cols * rows] = '\0';
 }
 
-bool Screen::clip(COORD *pt) const {
+bool Engine::clip(COORD *pt) const {
 	if(pt->X < 0 || pt->X >= cols || pt->Y < 0 || pt->Y > rows) return false;
 	return true;
 }
 
-void Screen::draw() {
+void Engine::draw() {
 	
 	if(status & st::init_) {
 		DWORD bytesWritten = 0;
-		WriteConsoleOutputCharacterW(console, screenBuffer, cols * rows + 1, { 0, 0 }, &bytesWritten);
+		WriteConsoleOutputCharacterW(console_out, screenBuffer, cols * rows + 1, { 0, 0 }, &bytesWritten);
 	} else std::cout << "not initialised\n";
 	
 }
 
-int Screen::drawCharacter(wchar_t character, COORD pos) {
+int Engine::drawCharacter(wchar_t character, COORD pos) {
 	
 	if(clip(&pos)) {
 		screenBuffer[pos.Y * cols + pos.X] = character;
@@ -116,7 +121,7 @@ int Screen::drawCharacter(wchar_t character, COORD pos) {
 	return -1;
 }
 
-int Screen::drawLine(wchar_t character, COORD p1, COORD p2) {
+int Engine::drawLine(wchar_t character, COORD p1, COORD p2) {
 	
 	// TODO: check if points inside screen (clip)  -  mostly done
 	// TODO: optimalise
@@ -140,7 +145,7 @@ int Screen::drawLine(wchar_t character, COORD p1, COORD p2) {
 	return 1;
 }
 
-int Screen::fillRect(wchar_t character, RECT rect) {
+int Engine::fillRect(wchar_t character, RECT rect) {
 	
 	// TODO: clip
 	
@@ -160,7 +165,7 @@ int Screen::fillRect(wchar_t character, RECT rect) {
 	return -1;
 }
 
-int Screen::fillRect(wchar_t character, COORD pos, COORD size) {
+int Engine::fillRect(wchar_t character, COORD pos, COORD size) {
 	
 	RECT rect = { pos.X, pos.Y, pos.X + size.X, pos.Y + size.Y };
 	

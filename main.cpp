@@ -4,7 +4,7 @@
 #include <ctime>
 #include <vector>
 
-#include "engine/screen.h"
+#include "engine/include.h"
 
 #define SQ(x) (x) * (x)
 
@@ -23,7 +23,7 @@ const unsigned int WIDTH = 130, HEIGHT = 90;
 
 int main() {
 	
-	Screen sc(WIDTH, HEIGHT);
+	Engine sc(120, 80);
 	sc.init();
 	
 	srand(time(NULL));
@@ -39,7 +39,11 @@ int main() {
 	
 	float a = 0;
 	
+	cEvent e;
+	
 	while(1) {
+		
+		cEvent::handleEvents(&e, sc.console_in);
 		
 		// objects[0].x = WIDTH/2 + cos(a*5) * (WIDTH/2);
 		// objects[0].y = HEIGHT/2 + sin(a*3) * (HEIGHT/2);
@@ -53,6 +57,8 @@ int main() {
 		
 		
 		sc.clearBuffer();
+		
+		sc.drawCharacter('O', { e.mouse.x, e.mouse.y });
 		
 		for(int i = 0; i < objects.size(); i++) {
 			
